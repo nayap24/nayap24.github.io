@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="CACHE-CONTROL" content="NO-CACHE">
+  <title>Simple Storage Dapp 예제 </title>
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+  <style type="text/css">
+    #storedData {font-size:300%; margin-right:10px;}
+    #newValue {width: 200px; margin-right:10px; text-align:right;}
+  </style>
+</head>
+<body>
+    <div class="container">
+        <h3>Simple Storage dApp 예제</h3>
+        <ul>
+            <li>컨트랙트 주소: <span id="contractAddr"></span></li>
+            <li>내 어카운트 주소: <span id="accountAddr"></span></li>
+            <li>컨트랙트에 저장된 값: <span id="storedData"></span>
+                <button onclick="getValue()" class="btn btn-default">새로고침</button> (현재블록: <span id="lastBlock"></span>)</li>
+            <li class="form-inline"><input id="newValue" type="text" class="form-control"><button onclick="setValue()" class="btn btn-default">새 값으로 저장하기</button>
+                <div id="result"></div></li>
+            <li>새 값을 저장한 후 팬딩 트랜잭션이 블록에 포함되면 자동으로 페이지가 업데이트될 것입니다.</li>
+        </ul>
+    </div>
+
+    <script src="https://cdn.rawgit.com/ethereum/web3.js/develop/dist/web3.js"></script>
+    <script type="text/javascript">
+        var contractAddress = "0xda198a6c09b428df29ff0db529af464ee89092da"
+        var abi = [{"constant":false,"inputs":[{"name":"x","type":"uint256"}],"name":"set","outputs":[],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"get","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"}];
+        var simpleStorageContract;
+        var simpleStorage;
+
+        window.addEventListener('load', function() {
+            // Checking if Web3 has been injected by the browser (Mist/MetaMask)
+            if (typeof web3 !== 'undefined') {
+                // Use Mist/MetaMask's provider
+                window.web3 = new Web3(web3.currentProvider);
+            } else {
+                console.log('No web3? You should consider trying MetaMask!')
+                // fallback - use your fallback strategy (local node / hosted node + in-dapp id mgmt / fail)
+                window.web3 = new Web3(new Web3.providers.HttpProvider("http://localhost:8545"));
+            }
+            // Now you can start your app & access web3 freely:
+            startApp();
+        });
+
+        function startApp() {
+            simpleStorageContract = web3.eth.contract(abi);
+            simpleStorage = simpleStorageContract.at(contractAddress);
+            document.getElementById('contractAddr').innerHTML = getLink(contractAddress);
+            web3.eth.getAccounts(function(e,r){
+                document.getElementById('accountAddr').innerHTML = getLink(r[0]);
+            });
+
+            getValue();
+        }
+
+        function getLink(addr) {
+            return '<a target="_blank" href=https://testnet.etherscan.io/address/' + addr + '>' + addr +'</a>';
+        }
+
+        function getValue() {
+            simpleStorage.get(function(e,r){
+                document.getElementById('storedData').innerHTML=r.toNumber();
+
+            });
+            web3.eth.getBlockNumber(function(e,r){
+                document.getElementById('lastBlock').innerHTML = r;
+            });
+        }
+
+        function setValue() {
+
+            var newValue = document.getElementById('newValue').value;
+            var txid
+            simpleStorage.set(newValue, function(e,r){
+                document.getElementById('result').innerHTML = 'Transaction id: ' + r + '<span id="pending" style="color:red;">(Pending)</span>';
+                txid = r;
+            });
+            var filter = web3.eth.filter('latest');
+            filter.watch(function(e, r) {
+                getValue();
+                web3.eth.getTransaction(txid, function(e,r){
+                if (r != null && r.blockNumber > 0) {
+                    document.getElementById('pending').innerHTML = '(기록된 블록: ' + r.blockNumber + ')';
+                    document.getElementById('pending').style.cssText ='color:green;';
+                    document.getElementById('storedData').style.cssText ='color:green; font-size:300%;';
+                    filter.stopWatching();
+                }
+            });
+            });
+        }
+    </script>
+</body>
+</html>
